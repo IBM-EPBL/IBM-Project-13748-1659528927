@@ -1,0 +1,121 @@
+from flask import Flask, render_template, request, redirect, url_for, session
+import ibm_db
+import re
+
+app = Flask(_name_)
+
+hostname = '2f3279a5-73d1-4859-88f0-a6c3e6b4b907.c3n41cmd0nqnrk39u98g.databases.appdomain.cloud'
+uid = 'hmf80902'
+pwd = 'oHzpnV88erkd09'
+driver = "{IBM DB2 ODBC DRIVER}"
+db_name = 'bludb'
+port = '30756'
+protocol = 'TCPIP'
+cert = "C:/Users/Prithiarun/Desktop/IBM/TEST/certi.crt"
+dsn = (
+    "DATABASE ={0};"
+    "HOSTNAME ={1};"
+    "PORT ={2};"
+    "UID ={3};"
+    "SECURITY=SSL;"
+    "PROTOCOL={4};"
+    "PWD ={6};"
+).format(db_name, hostname, port, uid, protocol, cert, pwd)
+connection = ibm_db.connect(dsn, "", "")
+print(dsn)
+# query = "SELECT username FROM USER1 WHERE username=?"
+# stmt = ibm_db.prepare(connection, query)
+# ibm_db.bind_param(stmt, 1, username)
+# ibm_db.execute(stmt)
+# username = ibm_db.fetch_assoc(stmt)
+# print(username)
+try:
+    conn = ibm_db.connect(dsn,"", "")
+    print("connected to database")
+except:
+    print("unable to connect")
+server = ibm_db.server_info(conn)
+print("DBSNAME: ", server.DBMS_NAME)
+print("DBMS_VER: ", server.DBMS_VER)
+print("DBNAME: ", server.DB_NAME)
+
+app.secret_key = 'a'
+
+
+@app.route('/', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    msg = " "
+    if request.method == 'POST':
+        username = request.form['username']
+        email_id = request.form['email_id']
+        phone_no = request.form['phone_no']
+        password = request.form['password']
+        query = "SELECT * FROM USER1 WHERE username=?;"
+        stmt = ibm_db.prepare(connection, query)
+        ibm_db.bind_param(stmt, 1, username)
+        ibm_db.execute(stmt)
+        account = ibm_db.fetch_assoc(stmt)
+        if (account):
+
+            msg = "Account already exists!"
+            return render_template('register.html', msg=msg)
+        # elif not re.match(r'[^@]+@[^@]+\.[^@]+', email_id):
+        #     msg = "Invalid email addres"
+        # elif not re.match(r'[A-Za-z0-9+', username):
+        #     msg = "Name must contain only characters and numbers"
+        else:
+            query = "INSERT INTO USER1 values(?,?,?,?)"
+            stmt = ibm_db.prepare(connection, query)
+            ibm_db.bind_param(stmt, 1, username)
+            ibm_db.bind_param(stmt, 2, email_id)
+            ibm_db.bind_param(stmt, 3, phone_no)
+            ibm_db.bind_param(stmt, 4, password)
+            ibm_db.execute(stmt)
+            msg = 'You have successfully Logged In!!'
+            return render_template('login.html', msg=msg)
+    else:
+        msg = 'PLEASE FILL OUT OF THE FORM'
+        return render_template('register.html', msg=msg)
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    global userid
+    msg = ' '
+    if request.method == "POST":
+        username = request.form['username']
+        password = request.form['password']
+        query = "select * from user1 where username=? and password=?"
+        stmt = ibm_db.prepare(connection, query)
+        ibm_db.bind_param(stmt, 1, username)
+        ibm_db.bind_param(stmt, 2, password)
+        ibm_db.execute(stmt)
+        account = ibm_db.fetch_assoc(stmt)
+        print(account)
+        if account:
+            session['Loggedin'] = True
+            session['id'] = account['USERNAME']
+            session['username'] = account['USERNAME']
+            msg = 'Logged in Successfully'
+            return render_template('welcome.html', msg=msg, username=str.upper(username))
+        else:
+            msg = 'Incorrect Username or Password'
+            return render_template('login.html', msg=msg)
+    else:
+        msg = 'PLEASE FILL OUT OF THE FORM'
+        return render_template('login.html', msg=msg)
+
+
+@app.route('/welcome', methods=['GET', 'POST'])
+def welcome():
+    if request.method == 'POST':
+        username = request.form['username']
+        print(username)
+        return render_template('welcome.html', username=username)
+    else:
+        return render_template('welcome.html', username=username)
+
+
+if "main" == _name_:
+    app.run()
